@@ -45,22 +45,25 @@ export async function DELETE(request: NextRequest) {
 
     if (req.task) {
       const existQuery = db.select().from(todoTable).where(eq(todoTable.task, req.task));
-      const exist = await db.select().from(todoTable).where(notExists(existQuery));
+      const exist = await db.select().from(todoTable).where(exists(existQuery));
 
-      if ((await exist).length!==0) {
+      if ((await exist).length === 0) {
         throw new Error("Task does not exist");
       }
-else{
-      const deletedTask = await db.delete(todoTable).where(
-        eq(todoTable.task, req.task)
-      );
-      console.log(deletedTask);
-      
-      return NextResponse.json({
-        message: "Data deleted successfully",
-        data: deletedTask,
-      });
-    } }
+      else {
+        const deletedTask = await db.delete(todoTable).where(
+          eq(todoTable.task, req.task)
+        );
+        await sql`ALTER SEQUENCE todos_id_seq RESTART WITH 1;`
+
+        console.log(deletedTask);
+
+        return NextResponse.json({
+          message: "Data deleted successfully",
+          data: deletedTask,
+        });
+      }
+    }
     else {
       throw new Error("Task field is required");
     }
@@ -68,3 +71,18 @@ else{
     return NextResponse.json({ message: (error as { message: string }).message });
   }
 }
+
+export async function PUT(request: NextRequest) {
+  const req = await request.json();
+  try {
+    if (req.id) {
+      const updateResult = await db.update(todoTable).set({ task: req.task }).where(eq(todoTable.id, req.id)).returning({ task: todoTable.task });
+      return NextResponse.json({ updateResult });
+    } else {
+      throw new Error("Task field is required");
+    }
+  } catch (err) {
+    return NextResponse.json({ message: (err as { message: string }).message });
+  }
+}
+
